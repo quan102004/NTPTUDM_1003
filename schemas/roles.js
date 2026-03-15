@@ -1,26 +1,25 @@
-let mongoose = require("mongoose");
 
-let roleSchema = new mongoose.Schema(
+const mongoose = require("mongoose");
+
+const roleSchema = new mongoose.Schema(
     {
         name: {
             type: String,
-            unique: [true, "name khong duoc trung"],
-            required: [true, "name khong duoc rong"],
-            trim: true,
+            required: true,
+            unique: true
         },
         description: {
             type: String,
-            default: "",
-            trim: true,
+            default: ""
         },
         isDeleted: {
             type: Boolean,
-            default: false,
-        },
+            default: false
+        }
     },
     {
-        timestamps: true,
-    },
+        timestamps: true
+    }
 );
 
-module.exports = new mongoose.model("role", roleSchema);
+module.exports = mongoose.model("role", roleSchema);

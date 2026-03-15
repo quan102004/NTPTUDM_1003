@@ -1,124 +1,70 @@
 var express = require("express");
 var router = express.Router();
+let bcrypt = require('bcrypt')
 let userModel = require("../schemas/users");
+let { validatedResult, CreateAnUserValidator, ModifyAnUserValidator } = require('../utils/validator')
+let userController = require('../controllers/users')
+let {CheckLogin} = require('../utils/authHandler')
 
-router.get("/", async function (req, res, next) {
-    try {
-        let users = await userModel.find({ isDeleted: false }).populate("role");
-        res.status(200).json(users);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+router.get("/", CheckLogin, async function (req, res, next) {
+  let users = await userController.GetAllUser()
+  res.send(users);
 });
 
 router.get("/:id", async function (req, res, next) {
-    try {
-        let user = await userModel
-            .findOne({
-                _id: req.params.id,
-                isDeleted: false,
-            })
-            .populate("role");
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+  let result = await userController.GetUserById(
+    req.params.id
+  )
+  if (result) {
+    res.send(result);
+  } else {
+    res.status(404).send({ message: "id not found" })
+  }
 });
 
-router.post("/", async function (req, res, next) {
-    try {
-        let user = new userModel(req.body);
-        let result = await user.save();
-        let populatedUser = await result.populate("role");
-        res.status(201).json(populatedUser);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+router.post("/", CreateAnUserValidator, validatedResult, async function (req, res, next) {
+  try {
+    let user = await userController.CreateAnUser(
+      req.body.username, req.body.password,
+      req.body.email, req.body.role
+    )
+    res.send(user);
+  } catch (err) {
+    res.status(400).send({ message: err.message });
+  }
 });
 
-router.post("/enable", async function (req, res, next) {
-    try {
-        let user = await userModel
-            .findOneAndUpdate(
-                {
-                    email: req.body.email,
-                    username: req.body.username,
-                    isDeleted: false,
-                },
-                { status: true },
-                { new: true },
-            )
-            .populate("role");
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found with provided email and username",
-            });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
+router.put("/:id", ModifyAnUserValidator, validatedResult, async function (req, res, next) {
+  try {
+    let id = req.params.id;
+    let updatedItem = await userModel.findByIdAndUpdate
+      (id, req.body, { new: true });
 
-router.post("/disable", async function (req, res, next) {
-    try {
-        let user = await userModel
-            .findOneAndUpdate(
-                {
-                    email: req.body.email,
-                    username: req.body.username,
-                    isDeleted: false,
-                },
-                { status: false },
-                { new: true },
-            )
-            .populate("role");
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found with provided email and username",
-            });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
+    if (!updatedItem) return res.status(404).send({ message: "id not found" });
 
-router.put("/:id", async function (req, res, next) {
-    try {
-        let user = await userModel
-            .findOneAndUpdate(
-                { _id: req.params.id, isDeleted: false },
-                req.body,
-                { new: true, runValidators: true },
-            )
-            .populate("role");
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    let populated = await userModel
+      .findById(updatedItem._id)
+    res.send(populated);
+  } catch (err) {
+    res.status(400).send({ message: err.message });
+  }
 });
 
 router.delete("/:id", async function (req, res, next) {
-    try {
-        let user = await userModel.findOneAndUpdate(
-            { _id: req.params.id, isDeleted: false },
-            { isDeleted: true },
-            { new: true },
-        );
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        res.status(200).json({ message: "User deleted", user: user });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+  try {
+    let id = req.params.id;
+    let updatedItem = await userModel.findByIdAndUpdate(
+      id,
+      { isDeleted: true },
+      { new: true }
+    );
+    if (!updatedItem) {
+      return res.status(404).send({ message: "id not found" });
     }
+    res.send(updatedItem);
+  } catch (err) {
+    res.status(400).send({ message: err.message });
+  }
 });
 
 module.exports = router;

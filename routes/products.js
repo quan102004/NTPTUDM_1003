@@ -1,69 +1,126 @@
-var express = require("express");
+var express = require('express');
 var router = express.Router();
-let productModel = require("../schemas/products");
+let productModel = require('../schemas/products');//dbContext
+const { default: slugify } = require('slugify');
 
-// Read all
-router.get("/", async function (req, res, next) {
-    try {
-        let products = await productModel.find({});
-        res.status(200).json(products);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+/* GET users listing. */
+router.get('/', async function (req, res, next) {
+  let queries = req.query;
+  let minPrice = queries.minprice ? queries.minprice : 0;
+  let maxPrice = queries.maxprice ? queries.maxprice : 10000;
+  let titleQ = queries.title ? queries.title : '';
+  let result = await productModel.find({
+    isDeleted: false,
+    title: new RegExp(titleQ,'i'),
+    price:{
+      $gte:minPrice,
+      $lte:maxPrice
     }
+  }).populate({
+    path:'category',
+    select:'name'
+  })
+  // result = result.filter(
+  //   function (e) {
+  //     return e.price >= minPrice && e.price <= maxPrice
+  //       && e.title.toLowerCase().includes(titleQ.toLowerCase())
+  //   }
+  // )
+  res.send(result);
 });
 
-// Read by id
-router.get("/:id", async function (req, res, next) {
-    try {
-        let product = await productModel.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-        res.status(200).json(product);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+router.get('/:id', async function (req, res, next) {
+  try {
+    let id = req.params.id;
+    let result = await productModel.findOne({
+      isDeleted: false,
+      _id: id
+    })
+    if (result) {
+      res.send(result);
+    } else {
+      res.status(404).send({ message: "ID NOT FOUND" });
     }
+  } catch (error) {
+    res.status(404).send({ message: error.message });
+  }
 });
 
-// Create
-router.post("/", async function (req, res, next) {
-    try {
-        let product = new productModel(req.body);
-        let result = await product.save();
-        res.status(201).json(result);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+router.post('/', async function (req, res, next) {
+  let newProduct = new productModel({
+    title: req.body.title,
+    slug: slugify(req.body.title, {
+      replacement: '-',
+      remove: undefined,
+      lower: true,
+      strict: false,
+    }),
+    price: req.body.price,
+    description: req.body.description,
+    category: req.body.category,
+    images: req.body.images
+  });
+  await newProduct.save();
+  res.send(newProduct)
+})
+router.put('/:id', async function (req, res, next) {
+  try {
+    let id = req.params.id;
+    //c1
+    // let result = await productModel.findOne({
+    //   isDeleted: false,
+    //   _id: id
+    // })
+    // if (result) {
+    //   let keys = Object.keys(req.body);
+    //   for (const key of keys) {
+    //     result[key] = req.body[key]
+    //   }
+    //   await result.save()
+    //   res.send(result)
+    // }
+    // else {
+    //   res.status(404).send({ message: "ID NOT FOUND" });
+    // }
+    //c2
+    let updatedItem = await productModel.findByIdAndUpdate(id, req.body, {
+      new: true
+    });
+    res.send(updatedItem)
+  } catch (error) {
+    res.status(404).send({ message: error.message });
+  }
 });
 
-// Update
-router.put("/:id", async function (req, res, next) {
-    try {
-        let product = await productModel.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true },
-        );
-        if (!product) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-        res.status(200).json(product);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Delete
-router.delete("/:id", async function (req, res, next) {
-    try {
-        let product = await productModel.findByIdAndDelete(req.params.id);
-        if (!product) {
-            return res.status(404).json({ message: "Product not found" });
-        }
-        res.status(200).json({ message: "Product deleted" });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+router.delete('/:id', async function (req, res, next) {
+  try {
+    let id = req.params.id;
+    //c1
+    // let result = await productModel.findOne({
+    //   isDeleted: false,
+    //   _id: id
+    // })
+    // if (result) {
+    //   let keys = Object.keys(req.body);
+    //   for (const key of keys) {
+    //     result[key] = req.body[key]
+    //   }
+    //   await result.save()
+    //   res.send(result)
+    // }
+    // else {
+    //   res.status(404).send({ message: "ID NOT FOUND" });
+    // }
+    //c2
+    let updatedItem = await productModel.findByIdAndUpdate(id, {
+      isDeleted: true
+    }, {
+      new: true
+    });
+    res.send(updatedItem)
+  } catch (error) {
+    res.status(404).send({ message: error.message });
+  }
 });
 
 module.exports = router;

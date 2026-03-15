@@ -1,55 +1,71 @@
-let mongoose = require("mongoose");
+const mongoose = require("mongoose");
+let bcrypt = require('bcrypt')
+const userSchema = new mongoose.Schema(
+  {
+    username: {
+      type: String,
+      required: [true, "Username is required"],
+      unique: true
+    },
 
-let userSchema = new mongoose.Schema(
-    {
-        username: {
-            type: String,
-            unique: [true, "username khong duoc trung"],
-            required: [true, "username khong duoc rong"],
-            trim: true,
-        },
-        password: {
-            type: String,
-            required: [true, "password khong duoc rong"],
-        },
-        email: {
-            type: String,
-            unique: [true, "email khong duoc trung"],
-            required: [true, "email khong duoc rong"],
-            trim: true,
-            lowercase: true,
-        },
-        fullName: {
-            type: String,
-            default: "",
-            trim: true,
-        },
-        avatarUrl: {
-            type: String,
-            default: "https://i.sstatic.net/l60Hf.png",
-        },
-        status: {
-            type: Boolean,
-            default: false,
-        },
-        role: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "role",
-            default: null,
-        },
-        loginCount: {
-            type: Number,
-            default: 0,
-            min: [0, "loginCount khong duoc nho hon 0"],
-        },
-        isDeleted: {
-            type: Boolean,
-            default: false,
-        },
+    password: {
+      type: String,
+      required: [true, "Password is required"]
     },
-    {
-        timestamps: true,
+
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      unique: true,
+      lowercase: true
     },
+
+    fullName: {
+      type: String,
+      default: ""
+    },
+
+    avatarUrl: {
+      type: String,
+      default: "https://i.sstatic.net/l60Hf.png"
+    },
+
+    status: {
+      type: Boolean,
+      default: false
+    },
+
+    role: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "role",
+      required: true
+    },
+
+    loginCount: {
+      type: Number,
+      default: 0,
+      min: [0, "Login count cannot be negative"]
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false
+    }
+  },
+  {
+    timestamps: true
+  }
 );
+userSchema.pre('save', function () {
+  let salt = bcrypt.genSaltSync(10);
+  this.password = bcrypt.hashSync(this.password, salt)
+})
+userSchema.pre('findOneAndUpdate', function () {
+  console.log(this);
+  if (this._update.password) {
+    let salt = bcrypt.genSaltSync(10);
+    this._update.password = bcrypt.hashSync(this._update.password, salt)
+  }
+})
 
-module.exports = new mongoose.model("user", userSchema);
+
+module.exports = mongoose.model("user", userSchema);
