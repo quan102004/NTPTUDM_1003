@@ -38,6 +38,17 @@ let productSchema = new mongoose.Schema({
 })
 
 //hook
+productSchema.post('save', async function (doc, next) {
+    let Inventory = require('./inventories');
+    await Inventory.create({
+        product: doc._id,
+        stock: 0,
+        reserved: 0,
+        soldCount: 0
+    });
+    next();
+});
+
 productSchema.pre('save', async function () {
     //this.slug = this.slug + "-1"
     let Product = this.constructor;

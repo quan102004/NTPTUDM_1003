@@ -1,13 +1,19 @@
 let userModel = require("../schemas/users");
-let bcrypt = require('bcrypt')
-let jwt = require('jsonwebtoken')
-let fs = require('fs')
-let path = require('path')
-
-const privateKey = fs.readFileSync(path.join(__dirname, '../private.key'), 'utf8');
+let bcrypt = require("bcrypt");
+let jwt = require("jsonwebtoken");
+let fs = require("fs");
 
 module.exports = {
-    CreateAnUser: async function (username, password, email, role, fullName, avatarUrl, status, loginCount) {
+    CreateAnUser: async function (
+        username,
+        password,
+        email,
+        role,
+        fullName,
+        avatarUrl,
+        status,
+        loginCount,
+    ) {
         let newItem = new userModel({
             username: username,
             password: password,
@@ -16,22 +22,20 @@ module.exports = {
             avatarUrl: avatarUrl,
             status: status,
             role: role,
-            loginCount: loginCount
+            loginCount: loginCount,
         });
         await newItem.save();
         return newItem;
     },
     GetAllUser: async function () {
-        return await userModel
-            .find({ isDeleted: false })
+        return await userModel.find({ isDeleted: false });
     },
     GetUserById: async function (id) {
         try {
-            return await userModel
-                .find({
-                    isDeleted: false,
-                    _id: id
-                })
+            return await userModel.find({
+                isDeleted: false,
+                _id: id,
+            });
         } catch (error) {
             return false;
         }
@@ -42,33 +46,47 @@ module.exports = {
         }
         let user = await userModel.findOne({
             username: username,
-            isDeleted: false
-        })
+            isDeleted: false,
+        });
         if (user) {
-            if (bcrypt.compareSync(password, user.password)) {
-                return jwt.sign({
-                    id: user.id
-                }, privateKey, {
-                    algorithm: 'RS256',
-                    expiresIn: '1d'
-                })
-            } else {
+            if (user.lockTime && user.lockTime > Date.now()) {
                 return false;
+            } else {
+                if (bcrypt.compareSync(password, user.password)) {
+                    user.loginCount = 0;
+                    await user.save();
+                    let token = jwt.sign(
+                        {
+                            id: user.id,
+                        },
+                        "secret",
+                        {
+                            expiresIn: "1d",
+                        },
+                    );
+                    return token;
+                } else {
+                    //sai pass
+                    user.loginCount++;
+                    if (user.loginCount == 3) {
+                        user.loginCount = 0;
+                        user.lockTime = Date.now() + 3_600_000;
+                    }
+                    await user.save();
+                    return false;
+                }
             }
         } else {
             return false;
         }
     },
-    ChangePassword: async function (id, oldPassword, newPassword) {
-        let user = await userModel.findOne({ _id: id, isDeleted: false });
-        if (!user) return { success: false, message: 'User not found' };
-        
-        if (!bcrypt.compareSync(oldPassword, user.password)) {
-            return { success: false, message: 'Old password is incorrect' };
+    ChangePassword: async function (user, oldPassword, newPassword) {
+        if (bcrypt.compareSync(oldPassword, user.password)) {
+            user.password = newPassword;
+            await user.save();
+            return true;
+        } else {
+            return false;
         }
-        
-        user.password = bcrypt.hashSync(newPassword, 10);
-        await user.save();
-        return { success: true, message: 'Password changed successfully' };
-    }
-}
+    },
+};
