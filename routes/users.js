@@ -4,9 +4,10 @@ let bcrypt = require('bcrypt')
 let userModel = require("../schemas/users");
 let { validatedResult, CreateAnUserValidator, ModifyAnUserValidator } = require('../utils/validator')
 let userController = require('../controllers/users')
-let {CheckLogin} = require('../utils/authHandler')
+let { CheckLogin, checkRole } = require('../utils/authHandler')
 
-router.get("/", CheckLogin, async function (req, res, next) {
+
+router.get("/", CheckLogin, checkRole("ADMIN","MODERATOR"), async function (req, res, next) {//ADMIN
   let users = await userController.GetAllUser()
   res.send(users);
 });
@@ -23,6 +24,7 @@ router.get("/:id", async function (req, res, next) {
 });
 
 router.post("/", CreateAnUserValidator, validatedResult, async function (req, res, next) {
+  
   try {
     let user = await userController.CreateAnUser(
       req.body.username, req.body.password,

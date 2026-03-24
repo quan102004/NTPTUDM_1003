@@ -1,5 +1,10 @@
 let mongoose = require('mongoose');
 let productSchema = new mongoose.Schema({
+    sku: {
+        type: String,
+        unique: [true, "sku khong duoc trung"],
+        required: [true, "sku khong duoc rong"]
+    },
     title: {
         type: String,
         unique: [true, "title khong duoc trung"],
@@ -38,17 +43,6 @@ let productSchema = new mongoose.Schema({
 })
 
 //hook
-productSchema.post('save', async function (doc, next) {
-    let Inventory = require('./inventories');
-    await Inventory.create({
-        product: doc._id,
-        stock: 0,
-        reserved: 0,
-        soldCount: 0
-    });
-    next();
-});
-
 productSchema.pre('save', async function () {
     //this.slug = this.slug + "-1"
     let Product = this.constructor;

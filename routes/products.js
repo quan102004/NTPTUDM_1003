@@ -1,7 +1,9 @@
 var express = require('express');
 var router = express.Router();
 let productModel = require('../schemas/products');//dbContext
+let inventoryModel = require('../schemas/inventories')
 const { default: slugify } = require('slugify');
+let mongoose = require('mongoose')
 
 /* GET users listing. */
 router.get('/', async function (req, res, next) {
@@ -11,14 +13,14 @@ router.get('/', async function (req, res, next) {
   let titleQ = queries.title ? queries.title : '';
   let result = await productModel.find({
     isDeleted: false,
-    title: new RegExp(titleQ,'i'),
-    price:{
-      $gte:minPrice,
-      $lte:maxPrice
+    title: new RegExp(titleQ, 'i'),
+    price: {
+      $gte: minPrice,
+      $lte: maxPrice
     }
   }).populate({
-    path:'category',
-    select:'name'
+    path: 'category',
+    select: 'name'
   })
   // result = result.filter(
   //   function (e) {
@@ -47,21 +49,36 @@ router.get('/:id', async function (req, res, next) {
 });
 
 router.post('/', async function (req, res, next) {
-  let newProduct = new productModel({
-    title: req.body.title,
-    slug: slugify(req.body.title, {
-      replacement: '-',
-      remove: undefined,
-      lower: true,
-      strict: false,
-    }),
-    price: req.body.price,
-    description: req.body.description,
-    category: req.body.category,
-    images: req.body.images
-  });
-  await newProduct.save();
-  res.send(newProduct)
+  let session = await mongoose.startSession();
+  session.startTransaction()
+  try {
+    let newProduct = new productModel({
+      title: req.body.title,
+      slug: slugify(req.body.title, {
+        replacement: '-',
+        remove: undefined,
+        lower: true,
+        strict: false,
+      }),
+      price: req.body.price,
+      description: req.body.description,
+      category: req.body.category,
+      images: req.body.images
+    });
+    newProduct = await newProduct.save({ session });
+    let newInventory = new inventoryModel({
+      product: newProduct._id
+    })
+    newInventory = await newInventory.save({ session });
+    newInventory = await newInventory.populate('product')
+    session.commitTransaction();
+    session.endSession()
+    res.send(newInventory)
+  } catch (error) {
+    session.abortTransaction();
+    session.endSession()
+    res.send(error.message)
+  }
 })
 router.put('/:id', async function (req, res, next) {
   try {
